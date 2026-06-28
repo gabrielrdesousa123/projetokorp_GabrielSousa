@@ -1,0 +1,5 @@
+# Coleção necessária para os módulos docker_compose_v2 / docker_network.
+# Instale com:  ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: community.docker
+    version: ">=3.6.0"

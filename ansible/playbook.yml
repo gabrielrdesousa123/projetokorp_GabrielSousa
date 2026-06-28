@@ -1,0 +1,135 @@
+---
+# ============================================================================
+# Desafio Projeto Korp - Provisionamento completo com Ansible
+# ----------------------------------------------------------------------------
+# Provisiona, com um único comando, todo o ambiente das Partes 1 e 2:
+#   - instala e habilita o Docker
+#   - cria a rede Docker bridge (korp-net)
+#   - builda a imagem do serviço http-server-projeto-korp
+#   - sobe os containers via docker compose (app + nginx + prometheus + grafana)
+#   - configura o proxy reverso (Nginx) e o monitoramento (Prometheus/Grafana)
+#   - valida o serviço com uma requisição HTTP e exibe a resposta no console
+#
+# Execução:
+#   ansible-galaxy collection install -r requirements.yml   (uma única vez)
+#   ansible-playbook -i inventory.ini playbook.yml --ask-become-pass
+# ============================================================================
+
+- name: Provisionar ambiente do Projeto Korp
+  hosts: korp
+  become: true
+
+  vars:
+    # Raiz do projeto = diretório pai de onde está o playbook (pasta ansible/).
+    project_dir: "{{ playbook_dir | dirname }}"
+    docker_network_name: korp-net
+    health_url: "http://localhost:80/projeto-korp"
+
+  tasks:
+
+    # ----------------------------------------------------------------------
+    # 1. Instalação do Docker
+    # ----------------------------------------------------------------------
+    - name: Instalar pacotes pré-requisito
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Criar diretório de keyrings do APT
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Baixar a chave GPG oficial do Docker
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Adicionar o repositório oficial do Docker
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }} {{ ansible_facts['distribution_release'] }} stable"
+        filename: docker
+        state: present
+
+    - name: Instalar Docker Engine, CLI, containerd e plugins (buildx/compose)
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Garantir que o serviço Docker está ativo e habilitado no boot
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    # ----------------------------------------------------------------------
+    # 2. Criação da rede Docker (bridge)
+    # ----------------------------------------------------------------------
+    - name: Verificar se a rede {{ docker_network_name }} já existe
+      ansible.builtin.command: "docker network inspect {{ docker_network_name }}"
+      register: net_inspect
+      changed_when: false
+      failed_when: false
+
+    - name: Criar a rede Docker bridge {{ docker_network_name }}
+      ansible.builtin.command: "docker network create --driver bridge {{ docker_network_name }}"
+      when: net_inspect.rc != 0
+      changed_when: true
+
+    # ----------------------------------------------------------------------
+    # 3. Build da imagem e subida dos containers (docker compose)
+    # ----------------------------------------------------------------------
+    - name: Build da imagem e subida do stack (app + nginx + prometheus + grafana)
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        build: always
+        pull: missing
+      register: compose_result
+
+    - name: Exibir resumo dos containers provisionados
+      ansible.builtin.debug:
+        var: compose_result.containers
+
+    # ----------------------------------------------------------------------
+    # 4. Validação do funcionamento via requisição HTTP
+    # ----------------------------------------------------------------------
+    - name: Aguardar o Nginx responder na porta 80
+      ansible.builtin.wait_for:
+        host: localhost
+        port: 80
+        delay: 3
+        timeout: 60
+
+    - name: Requisitar o endpoint do serviço através do Nginx
+      ansible.builtin.uri:
+        url: "{{ health_url }}"
+        method: GET
+        return_content: true
+        status_code: 200
+      register: korp_response
+      retries: 5
+      delay: 3
+      until: korp_response.status == 200
+
+    - name: Exibir a resposta do serviço no console
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "Validação OK - serviço http-server-projeto-korp respondeu:"
+          - "{{ korp_response.content }}"
+          - "Grafana:    http://localhost:3000  (admin/admin)"
+          - "Prometheus: http://localhost:9090/targets"
+          - "=========================================================="

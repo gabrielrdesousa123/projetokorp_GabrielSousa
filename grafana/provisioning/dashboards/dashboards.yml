@@ -1,0 +1,14 @@
+# Provisionamento automático de dashboards no Grafana (bônus).
+apiVersion: 1
+
+providers:
+  - name: "Projeto Korp"
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

@@ -1,0 +1,26 @@
+# Binários Go
+*.exe
+*.out
+server
+
+# Artefatos do Go
+go.work
+go.work.sum
+
+# Ansible
+*.retry
+ansible/*.log
+
+# Sistema operacional / sincronização
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log

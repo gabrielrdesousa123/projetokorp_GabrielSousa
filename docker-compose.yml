@@ -1,0 +1,79 @@
+# Docker Compose - Desafio Projeto Korp
+# Parte 1: serviço Go + Nginx (proxy reverso).
+# Parte 2: observabilidade com Prometheus + Grafana (Grafana provisionado).
+# Todos os containers compartilham a rede bridge dedicada korp-net.
+
+services:
+  # Aplicação Go. NÃO expõe portas ao host: o acesso é feito somente
+  # pela rede interna, através do Nginx (conforme exigido no desafio).
+  http-server-projeto-korp:
+    build: .
+    image: http-server-projeto-korp:latest
+    container_name: http-server-projeto-korp
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - korp-net
+
+  # Nginx oficial atuando como proxy reverso na porta 80.
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    depends_on:
+      - http-server-projeto-korp
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - korp-net
+
+  # Prometheus: coleta as métricas expostas pelo serviço em /metrics.
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    depends_on:
+      - http-server-projeto-korp
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - korp-net
+
+  # Grafana: visualização das métricas, com datasource e dashboard
+  # provisionados automaticamente (requisito bônus).
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - korp-net
+
+# Rede bridge dedicada para comunicação entre os containers.
+# Declarada como "external": é criada previamente (pelo playbook Ansible,
+# ou manualmente com `docker network create korp-net`).
+networks:
+  korp-net:
+    external: true
+    name: korp-net
+
+# Volumes nomeados para persistência de dados.
+volumes:
+  prometheus-data:
+  grafana-data:
