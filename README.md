@@ -10,7 +10,7 @@ O ambiente inteiro (instalação do Docker, rede, build, containers, proxy, moni
 
 ![Arquitetura do Projeto Korp](docs/arquitetura.svg)
 
-Somente o **Nginx** (porta 80), o **Prometheus** (9090) e o **Grafana** (3000) publicam portas no host. O serviço Go **não expõe porta diretamente** — só é acessível pela rede interna `korp-net`, exatamente como exige o desafio. Todo o ambiente é provisionado pelo **Ansible** com um único comando.
+Somente o **Nginx** (porta 80), o **Prometheus** (9090) e o **Grafana** (3000) publicam portas no host. O serviço Go **não expõe porta diretamente** — só é acessível pela rede interna `korp-net`. Todo o ambiente é provisionado pelo **Ansible** com um único comando.
 
 ---
 
@@ -44,9 +44,9 @@ projeto-korp/
 ├── grafana/
 │   └── provisioning/
 │       ├── datasources/
-│       │   └── datasource.yml      # datasource Prometheus (bônus)
+│       │   └── datasource.yml      # datasource Prometheus 
 │       └── dashboards/
-│           ├── dashboards.yml      # provider de dashboards (bônus)
+│           ├── dashboards.yml      # provider de dashboards 
 │           └── http-server-projeto-korp-dashboard.json
 └── ansible/
     ├── ansible.cfg
@@ -144,7 +144,7 @@ O dashboard do Grafana apresenta: disponibilidade do serviço, total e taxa de r
 - **Multi-stage build / Alpine:** o `Dockerfile` compila um binário estático (`CGO_ENABLED=0`, `-ldflags "-s -w"`) e o copia para uma imagem Alpine mínima, executando como usuário **não-root** — imagem enxuta e mais segura.
 - **App sem porta exposta:** o acesso externo passa obrigatoriamente pelo Nginx, atendendo ao requisito e reduzindo a superfície de exposição.
 - **Rede `korp-net` como `external`:** a criação da rede é um passo explícito do playbook Ansible (conforme o desafio), e o Compose a reutiliza.
-- **Grafana 100% provisionado (bônus):** datasource e dashboard versionados como código (`datasource.yml`, `dashboards.yml`, `*.json`) — sem cliques manuais, reprodutível.
+- **Grafana 100% provisionado:** datasource e dashboard versionados como código (`datasource.yml`, `dashboards.yml`, `*.json`) — sem cliques manuais, reprodutível.
 - **Disponibilidade via `/health` + `up`:** combina um sinal interno (endpoint) com o sinal externo de scrape do Prometheus.
 
 ---
@@ -162,7 +162,7 @@ O dashboard do Grafana apresenta: disponibilidade do serviço, total e taxa de r
 | Prometheus + Grafana no compose | `docker-compose.yml` |
 | Dashboard no Grafana | `grafana/provisioning/dashboards/...` |
 | Playbook Ansible (provisionamento com um comando) | `ansible/playbook.yml` |
-| **Bônus:** Grafana provisionado automaticamente | `grafana/provisioning/` |
+|Grafana provisionado automaticamente | `grafana/provisioning/` |
 
 ---
 
